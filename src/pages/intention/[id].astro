@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Calendar, Users } from "lucide-react";
+import { Calendar, Users, ChevronLeft, ChevronRight } from "lucide-react";
 import { getCurrentWeek, getMysteryForSlot } from "../../lib/rosary";
 
 export const prerender = false;
@@ -92,11 +92,20 @@ if (Astro.request.method === "POST") {
 }
 
 // Build table data
-const weekNumber = getCurrentWeek(intention.start_date);
+const realWeekNumber = getCurrentWeek(intention.start_date);
+
+// Symulacja tygodnia: czytamy z URL albo jako fallback bierzemy poprawie przeliczony
+const urlWeekParam = Astro.url.searchParams.get("week");
+const simulatedWeek = urlWeekParam
+    ? parseInt(urlWeekParam, 10)
+    : realWeekNumber;
+// Zabezpieczenie minimalnego tygodnia -> nie schodzimy poniżej 1
+const activeWeek = Math.max(1, simulatedWeek);
+
 const slotsData = Array.from({ length: 20 }, (_, i) => {
     const slotNumber = i + 1;
     const participant = (participants || []).find((p) => p.slot === slotNumber);
-    const mystery = getMysteryForSlot(slotNumber, weekNumber);
+    const mystery = getMysteryForSlot(slotNumber, activeWeek);
 
     return {
         slotNumber,
@@ -104,6 +113,9 @@ const slotsData = Array.from({ length: 20 }, (_, i) => {
         mystery,
     };
 });
+
+const prevWeekUrl = `/intention/${id}?week=${activeWeek - 1}`;
+const nextWeekUrl = `/intention/${id}?week=${activeWeek + 1}`;
 ---
 
 <Layout title={`Różaniec - ${intention.title}`}>
@@ -136,20 +148,68 @@ const slotsData = Array.from({ length: 20 }, (_, i) => {
         </CardHeader>
         <CardContent className="px-6 md:px-8 pb-8">
             <div
-                class="flex flex-wrap gap-4 text-sm font-medium text-muted-foreground mr-10 relative z-10"
+                class="flex flex-wrap gap-4 text-sm font-medium text-muted-foreground mr-10 relative z-10 items-center mt-2"
             >
                 <span class="flex items-center gap-1.5"
                     ><Calendar className="w-4 h-4" /> Start: {
                         new Date(intention.start_date).toLocaleDateString(
                             "pl-PL"
                         )
-                    }</span
-                >
-                <span class="flex items-center gap-1.5"
-                    ><Users className="w-4 h-4" /> Aktualny tydzień: <strong
-                        class="text-black ml-1">{weekNumber}</strong
-                    >
+                    }
                 </span>
+
+                <div class="h-4 w-px bg-border mx-1 hidden sm:block"></div>
+
+                <div
+                    class="flex items-center gap-2 bg-white/60 px-3 py-1.5 rounded-full border border-black/5 shadow-sm"
+                >
+                    <span class="flex items-center mr-1"
+                        ><Users className="w-4 h-4 mr-2 opacity-70" /> Tydzień: <strong
+                            class="text-black ml-1.5 text-base"
+                            >{activeWeek}</strong
+                        >
+                    </span>
+
+                    <div
+                        class="flex items-center gap-1 ml-2 border-l border-black/10 pl-2"
+                    >
+                        <a
+                            href={activeWeek > 1 ? prevWeekUrl : "#"}
+                            class={`p-1 rounded-full transition-colors ${
+                                activeWeek > 1
+                                    ? "hover:bg-black/5 text-black hover:text-black cursor-pointer"
+                                    : "opacity-30 cursor-not-allowed pointer-events-none"
+                            }`}
+                            aria-label="Poprzedni tydzień"
+                        >
+                            <ChevronLeft className="w-5 h-5" />
+                        </a>
+                        <a
+                            href={nextWeekUrl}
+                            class="p-1 rounded-full hover:bg-black/5 text-primary hover:text-primary transition-colors"
+                            aria-label="Następny tydzień"
+                        >
+                            <ChevronRight className="w-5 h-5" />
+                        </a>
+                    </div>
+                </div>
+
+                {
+                    activeWeek !== realWeekNumber && (
+                        <Badge
+                            variant="outline"
+                            className="text-xs bg-orange-100/50 text-orange-800 border-orange-200"
+                        >
+                            Tryb symulacji
+                            <a
+                                href={`/intention/${id}`}
+                                class="ml-2 hover:underline"
+                            >
+                                Zresetuj &times;
+                            </a>
+                        </Badge>
+                    )
+                }
             </div>
         </CardContent>
     </Card>
@@ -177,7 +237,7 @@ const slotsData = Array.from({ length: 20 }, (_, i) => {
                                 <th class="w-12 text-center">#</th>
                                 <th class="min-w-[120px]">Uczestnik</th>
                                 <th class="min-w-[200px]"
-                                    >Tajemnica (Tydzień {weekNumber})</th
+                                    >Tajemnica (Tydzień {activeWeek})</th
                                 >
                                 <th class="text-right">Grupa</th>
                             </tr>
