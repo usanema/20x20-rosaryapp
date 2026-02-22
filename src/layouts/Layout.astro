@@ -1,0 +1,44 @@
+---
+import "../styles/global.css";
+
+interface Props {
+    title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="pl">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="description"
+            content="Aplikacja grupowego Różańca w intencji"
+        />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1, maximum-scale=1"
+        />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <meta name="generator" content={Astro.generator} />
+        <title>{title}</title>
+    </head>
+    <body
+        class="min-h-screen bg-[#f5f5f7] text-foreground font-sans selection:bg-primary/20"
+    >
+        <main class="max-w-4xl mx-auto px-4 py-12 md:py-20">
+            <header class="mb-10 text-center">
+                <h1
+                    class="text-4xl md:text-5xl font-semibold tracking-tight text-black mb-3"
+                >
+                    Różaniec
+                </h1>
+                <p class="text-base md:text-lg text-muted-foreground">
+                    Wspólna modlitwa w jednej intencji.
+                </p>
+            </header>
+            <slot />
+        </main>
+    </body>
+</html>

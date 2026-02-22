@@ -1,0 +1,312 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { supabase } from "../../lib/supabase";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Calendar, Users } from "lucide-react";
+import { getCurrentWeek, getMysteryForSlot } from "../../lib/rosary";
+
+export const prerender = false;
+
+const { id } = Astro.params;
+
+// 1. Fetch details
+const { data: intention, error: intentionError } = await supabase
+    .from("intentions")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+if (intentionError || !intention) {
+    return new Response("Nie znaleziono intencji.", { status: 404 });
+}
+
+// 2. Fetch participants
+const { data: participants, error: participantsError } = await supabase
+    .from("participants")
+    .select("*")
+    .eq("intention_id", id)
+    .order("slot", { ascending: true });
+
+let pError = "";
+let formSuccess = false;
+
+// 3. Handle Form if POST
+if (Astro.request.method === "POST") {
+    const formData = await Astro.request.formData();
+    const firstName = String(formData.get("firstName") || "").trim();
+    const lastName = String(formData.get("lastName") || "").trim();
+    const email = String(formData.get("email") || "").trim();
+
+    if (!firstName) {
+        pError = "Imię jest wymagane.";
+    } else {
+        // Find first empty slot
+        const takenSlots = new Set((participants || []).map((p) => p.slot));
+        let nextSlot = -1;
+        for (let i = 1; i <= 20; i++) {
+            if (!takenSlots.has(i)) {
+                nextSlot = i;
+                break;
+            }
+        }
+
+        if (nextSlot === -1) {
+            pError = "Niestety, wszystkie miejsca (20) są już zajęte.";
+        } else {
+            const { error: insertError } = await supabase
+                .from("participants")
+                .insert([
+                    {
+                        intention_id: id,
+                        first_name: firstName,
+                        last_name: lastName || null,
+                        email: email || null,
+                        slot: nextSlot,
+                    },
+                ]);
+
+            if (insertError) {
+                if (insertError.code === "23505") {
+                    pError = "Ktoś właśnie zajął to miejsce! Spróbuj ponownie.";
+                } else {
+                    pError = "Błąd dołączania: " + insertError.message;
+                }
+            } else {
+                formSuccess = true;
+                // Zreloaduj aby wczytać nowego uczestnika bez przekierowań (Astro)
+                // Można zwrócić Redirect na sam siebie żeby wyczyścić POST state.
+                return Astro.redirect(`/intention/${id}`);
+            }
+        }
+    }
+}
+
+// Build table data
+const weekNumber = getCurrentWeek(intention.start_date);
+const slotsData = Array.from({ length: 20 }, (_, i) => {
+    const slotNumber = i + 1;
+    const participant = (participants || []).find((p) => p.slot === slotNumber);
+    const mystery = getMysteryForSlot(slotNumber, weekNumber);
+
+    return {
+        slotNumber,
+        participant,
+        mystery,
+    };
+});
+---
+
+<Layout title={`Różaniec - ${intention.title}`}>
+    <div class="mb-6 flex items-center justify-between">
+        <a
+            href="/"
+            class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >&larr; Intencje</a
+        >
+        <Badge
+            variant={intention.status === "active" ? "default" : "secondary"}
+            className="rounded-full px-3 py-1 text-sm font-medium shadow-sm"
+        >
+            {intention.status === "active" ? "W trakcie" : "Zakończona"}
+        </Badge>
+    </div>
+
+    <Card
+        className="glass border-black/5 rounded-3xl shadow-sm mb-10 overflow-hidden relative"
+    >
+        <div class="absolute top-0 right-0 p-8 opacity-5">
+            <Users className="w-32 h-32" />
+        </div>
+        <CardHeader className="pb-4 pt-8 px-6 md:px-8">
+            <CardTitle
+                className="text-2xl md:text-3xl font-semibold leading-tight text-black max-w-[85%]"
+            >
+                {intention.title}
+            </CardTitle>
+        </CardHeader>
+        <CardContent className="px-6 md:px-8 pb-8">
+            <div
+                class="flex flex-wrap gap-4 text-sm font-medium text-muted-foreground mr-10 relative z-10"
+            >
+                <span class="flex items-center gap-1.5"
+                    ><Calendar className="w-4 h-4" /> Start: {
+                        new Date(intention.start_date).toLocaleDateString(
+                            "pl-PL"
+                        )
+                    }</span
+                >
+                <span class="flex items-center gap-1.5"
+                    ><Users className="w-4 h-4" /> Aktualny tydzień: <strong
+                        class="text-black ml-1">{weekNumber}</strong
+                    >
+                </span>
+            </div>
+        </CardContent>
+    </Card>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        <div class="lg:col-span-2 space-y-6">
+            <h3
+                class="text-xl font-semibold tracking-tight text-black flex items-center gap-2"
+            >
+                Rozkład Modlitwy <span
+                    class="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-sm"
+                    >{participants?.length || 0}/20</span
+                >
+            </h3>
+
+            <div
+                class="glass rounded-3xl border border-black/5 overflow-hidden shadow-sm"
+            >
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead
+                            class="bg-black/5 border-b border-black/5 [&_th]:font-medium [&_th]:text-black [&_th]:py-3 [&_th]:px-4 [&_th]:text-left"
+                        >
+                            <tr>
+                                <th class="w-12 text-center">#</th>
+                                <th class="min-w-[120px]">Uczestnik</th>
+                                <th class="min-w-[200px]"
+                                    >Tajemnica (Tydzień {weekNumber})</th
+                                >
+                                <th class="text-right">Grupa</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-black/5">
+                            {
+                                slotsData.map(
+                                    ({ slotNumber, participant, mystery }) => (
+                                        <tr class="hover:bg-black/[0.02] transition-colors">
+                                            <td class="py-3 px-4 text-center font-medium text-muted-foreground">
+                                                {slotNumber}
+                                            </td>
+                                            <td class="py-3 px-4">
+                                                {participant ? (
+                                                    <span class="font-medium text-black">
+                                                        {participant.first_name}{" "}
+                                                        {participant.last_name ||
+                                                            ""}
+                                                    </span>
+                                                ) : (
+                                                    <span class="text-muted-foreground italic">
+                                                        Wolne miejsce
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td class="py-3 px-4 text-black">
+                                                {mystery.name}
+                                            </td>
+                                            <td class="py-3 px-4 text-right">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="border-black/10 text-muted-foreground font-normal bg-white/50"
+                                                >
+                                                    {mystery.groupName}
+                                                </Badge>
+                                            </td>
+                                        </tr>
+                                    )
+                                )
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        {/* Formularz lub Info */}
+        <div class="lg:sticky lg:top-8">
+            {
+                (participants?.length || 0) < 20 ? (
+                    <Card className="glass border-black/5 rounded-3xl shadow-sm">
+                        <form method="POST">
+                            <CardHeader>
+                                <CardTitle className="text-xl">
+                                    Dołącz do modlitwy
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {pError && (
+                                    <div class="p-3 text-sm text-red-600 bg-red-50 rounded-lg border border-red-100">
+                                        {pError}
+                                    </div>
+                                )}
+                                <div class="space-y-2">
+                                    <Label
+                                        htmlFor="firstName"
+                                        className="text-black font-medium"
+                                    >
+                                        Imię
+                                    </Label>
+                                    <Input
+                                        id="firstName"
+                                        name="firstName"
+                                        required
+                                        className="rounded-xl bg-white/50 focus:bg-white transition-colors"
+                                        placeholder="np. Jan"
+                                    />
+                                </div>
+                                <div class="space-y-2">
+                                    <Label
+                                        htmlFor="lastName"
+                                        className="text-black font-medium"
+                                    >
+                                        Nazwisko (opcjonalnie)
+                                    </Label>
+                                    <Input
+                                        id="lastName"
+                                        name="lastName"
+                                        className="rounded-xl bg-white/50 focus:bg-white transition-colors"
+                                        placeholder="Kowalski"
+                                    />
+                                </div>
+                                <div class="space-y-2">
+                                    <Label
+                                        htmlFor="email"
+                                        className="text-black font-medium"
+                                    >
+                                        Email (opcjonalnie)
+                                    </Label>
+                                    <Input
+                                        id="email"
+                                        name="email"
+                                        type="email"
+                                        className="rounded-xl bg-white/50 focus:bg-white transition-colors"
+                                        placeholder="jan@example.com"
+                                    />
+                                </div>
+                            </CardContent>
+                            <CardFooter>
+                                <Button
+                                    type="submit"
+                                    className="w-full rounded-full h-11 transition-transform active:scale-95 shadow"
+                                >
+                                    Zajmij pojedyncze miejsce
+                                </Button>
+                            </CardFooter>
+                        </form>
+                    </Card>
+                ) : (
+                    <Card className="glass border-black/5 rounded-3xl shadow-sm bg-primary/5 border-primary/20">
+                        <CardHeader>
+                            <CardTitle className="text-xl text-primary">
+                                Pełna grupa
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p class="text-sm text-muted-foreground">
+                                Do tej intencji dołączyło już 20 unikalnych
+                                osób. Lista odmawiania jest kompletna i
+                                uformowana.
+                            </p>
+                        </CardContent>
+                    </Card>
+                )
+            }
+        </div>
+    </div>
+</Layout>

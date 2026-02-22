@@ -1,0 +1,143 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { supabase } from "../lib/supabase";
+import {
+    Card,
+    CardHeader,
+    CardTitle,
+    CardContent,
+    CardFooter,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+
+export const prerender = false;
+
+let errorMessage = "";
+
+if (Astro.request.method === "POST") {
+    const formData = await Astro.request.formData();
+    const title = String(formData.get("title") || "").trim();
+    const rawDate = String(formData.get("startDate") || "");
+
+    // Validation
+    if (!title) {
+        errorMessage = "Tytuł intencji jest wymagany.";
+    } else if (!rawDate) {
+        errorMessage = "Data rozpoczęcia jest wymagana.";
+    } else {
+        const startDate = new Date(rawDate);
+        // Niedziela == 0
+        if (startDate.getDay() !== 0) {
+            errorMessage = "Planowana data startu musi być Niedzielą.";
+        } else {
+            // Create new intention
+            const { data, error } = await supabase
+                .from("intentions")
+                .insert([{ title, start_date: rawDate }])
+                .select()
+                .single();
+
+            if (error) {
+                errorMessage = "Błąd zapisywania do bazy: " + error.message;
+            } else if (data) {
+                return Astro.redirect(`/intention/${data.id}`);
+            }
+        }
+    }
+}
+---
+
+<Layout title="Różaniec - Utwórz intencję">
+    <div class="mb-8 flex items-center gap-4">
+        <a
+            href="/"
+            class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >&larr; Wróć</a
+        >
+        <h2 class="text-2xl font-semibold tracking-tight text-black">
+            Nowa wstawiennicza
+        </h2>
+    </div>
+
+    <Card
+        className="glass border-black/5 rounded-3xl max-w-xl mx-auto shadow-sm"
+    >
+        <form method="POST">
+            <CardHeader>
+                <CardTitle className="text-xl">Parametry modlitwy</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                {
+                    errorMessage && (
+                        <div class="p-3 text-sm text-red-600 bg-red-50 rounded-lg border border-red-100">
+                            {errorMessage}
+                        </div>
+                    )
+                }
+
+                <div class="space-y-2">
+                    <Label htmlFor="title" className="text-black font-medium"
+                        >Treść (intencja)</Label
+                    >
+                    <Textarea
+                        id="title"
+                        name="title"
+                        placeholder="np. O zdrowie dla naszej koleżanki Kasi..."
+                        className="rounded-xl resize-none min-h-[100px] bg-white/50 focus:bg-white transition-colors"
+                        required
+                    />
+                </div>
+
+                <div class="space-y-2">
+                    <Label
+                        htmlFor="startDate"
+                        className="text-black font-medium"
+                        >Data startu nowenny</Label
+                    >
+                    <Input
+                        id="startDate"
+                        type="date"
+                        name="startDate"
+                        className="rounded-xl bg-white/50 focus:bg-white transition-colors"
+                        required
+                    />
+                    <p class="text-xs text-muted-foreground ml-1">
+                        Zwróć uwagę, by wyznaczony dzień był Niedzielą.
+                    </p>
+                </div>
+            </CardContent>
+            <CardFooter>
+                <Button
+                    type="submit"
+                    className="w-full rounded-full h-12 text-base font-medium transition-transform active:scale-95 shadow"
+                >
+                    Zatwierdź intencję
+                </Button>
+            </CardFooter>
+        </form>
+    </Card>
+
+    <script>
+        // JS Validation to gently hint users
+        const dateInput = document.getElementById(
+            "startDate"
+        ) as HTMLInputElement;
+        if (dateInput) {
+            dateInput.addEventListener("change", (e) => {
+                const val = (e.target as HTMLInputElement).value;
+                if (val) {
+                    const d = new Date(val);
+                    if (d.getDay() !== 0) {
+                        alert(
+                            "Wybrana data nie jest Niedzielą na początek tygodnia."
+                        );
+                        (e.target as HTMLInputElement).value = ""; // Reset
+                    }
+                }
+            });
+        }
+    </script>
+</Layout>
