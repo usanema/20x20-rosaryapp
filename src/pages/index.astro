@@ -14,15 +14,19 @@ const { data: intentions, error } = await supabase
 ---
 
 <Layout title="Różaniec - Lista Intencji">
-	<div class="flex justify-between items-center mb-8">
-		<h2 class="text-2xl font-semibold tracking-tight text-black">
+	<div
+		class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150 fill-mode-forwards opacity-0"
+	>
+		<h2
+			class="text-2xl md:text-3xl font-semibold tracking-tight text-black"
+		>
 			Aktywne intencje
 		</h2>
 		<a
 			href="/create-intention"
-			class="inline-flex items-center justify-center whitespace-nowrap rounded-full text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-10 px-5 transition-transform active:scale-95"
+			class="inline-flex w-full sm:w-auto items-center justify-center whitespace-nowrap rounded-full text-base font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary/95 text-primary-foreground shadow-lg hover:shadow-primary/25 hover:bg-primary h-12 px-6 active:scale-95"
 		>
-			<Plus className="w-4 h-4 mr-2" />
+			<Plus className="w-5 h-5 mr-2" />
 			Utwórz nową
 		</a>
 	</div>
@@ -42,16 +46,18 @@ const { data: intentions, error } = await supabase
 				</p>
 			</div>
 		) : (
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-				{intentions?.map((intention) => (
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-5 md:gap-6">
+				{intentions?.map((intention, index) => (
 					<a
 						href={`/intention/${intention.id}`}
-						class="block group transition-transform active:scale-95 duration-200"
+						class="block group outline-none"
+						style={`animation-delay: ${200 + index * 100}ms`}
 					>
-						<Card className="glass h-full border-black/5 hover:border-black/10 transition-colors shadow-sm hover:shadow-md cursor-pointer rounded-2xl p-2">
-							<CardHeader className="pb-3 px-4 pt-4">
-								<div class="flex justify-between items-start gap-4">
-									<CardTitle className="text-xl font-medium leading-tight text-black">
+						<Card className="glass h-full border-white/40 group-hover:border-white/60 transition-all duration-300 group-hover:shadow-xl group-hover:shadow-black/5 group-hover:-translate-y-1 group-focus-visible:ring-2 group-focus-visible:ring-primary rounded-3xl p-1 relative overflow-hidden">
+							<div class="absolute inset-0 bg-gradient-to-br from-white/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl" />
+							<CardHeader className="pb-3 px-5 pt-5 relative z-10">
+								<div class="flex flex-col sm:flex-row justify-between items-start gap-3">
+									<CardTitle className="text-xl font-semibold leading-tight text-black group-hover:text-primary transition-colors">
 										{intention.title}
 									</CardTitle>
 									<Badge
@@ -60,7 +66,11 @@ const { data: intentions, error } = await supabase
 												? "default"
 												: "secondary"
 										}
-										className="rounded-full px-2.5 py-0.5 line-clamp-1 shrink-0 font-medium"
+										className={`rounded-full px-3 py-1 line-clamp-1 shrink-0 font-medium ${
+											intention.status === "active"
+												? "bg-primary/10 text-primary hover:bg-primary/20 border-primary/10 shadow-none"
+												: ""
+										}`}
 									>
 										{intention.status === "active"
 											? "W trakcie"
@@ -68,13 +78,15 @@ const { data: intentions, error } = await supabase
 									</Badge>
 								</div>
 							</CardHeader>
-							<CardContent className="px-4 pb-4">
-								<div class="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+							<CardContent className="px-5 pb-5 relative z-10">
+								<div class="text-sm font-medium text-muted-foreground flex items-center gap-1.5 bg-black/5 w-fit px-3 py-1.5 rounded-full">
 									<Calendar className="w-4 h-4 opacity-70" />
-									Od:{" "}
-									{new Date(
-										intention.start_date
-									).toLocaleDateString("pl-PL")}
+									Start:{" "}
+									<span class="text-black ml-0.5">
+										{new Date(
+											intention.start_date
+										).toLocaleDateString("pl-PL")}
+									</span>
 								</div>
 							</CardContent>
 						</Card>

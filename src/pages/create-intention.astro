@@ -63,9 +63,13 @@ if (Astro.request.method === "POST") {
     </div>
 
     <Card
-        className="glass border-black/5 rounded-3xl max-w-xl mx-auto shadow-sm"
+        className="glass border-white/40 shadow-xl shadow-black/5 rounded-[2rem] max-w-xl mx-auto overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700 relative"
     >
-        <form method="POST">
+        <div
+            class="absolute inset-0 bg-gradient-to-br from-white/40 to-white/10 z-0"
+        >
+        </div>
+        <form method="POST" class="relative z-10">
             <CardHeader>
                 <CardTitle className="text-xl">Parametry modlitwy</CardTitle>
             </CardHeader>
@@ -78,41 +82,43 @@ if (Astro.request.method === "POST") {
                     )
                 }
 
-                <div class="space-y-2">
-                    <Label htmlFor="title" className="text-black font-medium"
+                <div class="space-y-3">
+                    <Label
+                        htmlFor="title"
+                        className="text-black font-semibold text-base"
                         >Treść (intencja)</Label
                     >
                     <Textarea
                         id="title"
                         name="title"
                         placeholder="np. O zdrowie dla naszej koleżanki Kasi..."
-                        className="rounded-xl resize-none min-h-[100px] bg-white/50 focus:bg-white transition-colors"
+                        className="rounded-2xl resize-none min-h-[120px] bg-white/60 focus:bg-white text-base shadow-inner border-white/50 focus-visible:ring-primary/30 transition-all duration-300"
                         required
                     />
                 </div>
 
-                <div class="space-y-2">
+                <div class="space-y-3">
                     <Label
                         htmlFor="startDate"
-                        className="text-black font-medium"
+                        className="text-black font-semibold text-base"
                         >Data startu nowenny</Label
                     >
                     <Input
                         id="startDate"
                         type="date"
                         name="startDate"
-                        className="rounded-xl bg-white/50 focus:bg-white transition-colors"
+                        className="rounded-2xl h-12 bg-white/60 focus:bg-white text-base shadow-inner border-white/50 focus-visible:ring-primary/30 transition-all duration-300"
                         required
                     />
-                    <p class="text-xs text-muted-foreground ml-1">
+                    <p class="text-sm text-muted-foreground ml-2">
                         Zwróć uwagę, by wyznaczony dzień był Niedzielą.
                     </p>
                 </div>
             </CardContent>
-            <CardFooter>
+            <CardFooter className="pb-8 px-6">
                 <Button
                     type="submit"
-                    className="w-full rounded-full h-12 text-base font-medium transition-transform active:scale-95 shadow"
+                    className="w-full rounded-full h-14 text-lg font-medium transition-all hover:scale-[1.02] active:scale-95 shadow-lg shadow-primary/25 bg-primary/95 hover:bg-primary"
                 >
                     Zatwierdź intencję
                 </Button>
