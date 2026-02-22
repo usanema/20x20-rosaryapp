@@ -15,5 +15,8 @@ export default defineConfig({
   },
 
   output: "server",
-  adapter: vercel()
+  adapter: vercel(),
+  security: {
+    checkOrigin: false
+  }
 });
