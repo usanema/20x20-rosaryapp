@@ -5,12 +5,16 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Calendar } from "lucide-react";
 
+import { syncIntentionStatus } from "../lib/rosary";
+
 export const prerender = false;
 
-const { data: intentions, error } = await supabase
+const { data: rawIntentions, error } = await supabase
 	.from("intentions")
 	.select("*")
 	.order("created_at", { ascending: false });
+
+const intentions = rawIntentions ? await syncIntentionStatus(rawIntentions) : null;
 ---
 
 <Layout title="Różaniec - Lista Intencji">

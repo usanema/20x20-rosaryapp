@@ -1,3 +1,5 @@
+import { supabase } from "./supabase";
+
 export const MYSTERY_GROUPS = [
     "Radosne",
     "Światła",
@@ -33,13 +35,11 @@ export const MYSTERIES = [
 ];
 
 /**
- * Oblicza aktualny tydzień różańca od daty startu (która jest zawsze niedzielą).
- * Przedział: Tygodnie 1 do 20+.
+ * Oblicza aktualny tydzień różańca od daty startu.
+ * Przedział: Tygodnie 1 do 20.
  */
 export function getCurrentWeek(startDateString: string, currentDate: Date = new Date()): number {
-    // Parsujemy date zakładając lokalną strefę czasową serwera by uniknąć przesunięć
     const startDate = new Date(startDateString);
-    // Zrównujemy czas do lokalnej północy
     startDate.setHours(0, 0, 0, 0);
 
     const current = new Date(currentDate);
@@ -47,16 +47,56 @@ export function getCurrentWeek(startDateString: string, currentDate: Date = new 
 
     const diffTime = current.getTime() - startDate.getTime();
 
-    // Jeśli data startu jest w przyszłości, traktujemy to jako tydzień 1 (okres przygotowawczy)
     if (diffTime < 0) {
         return 1;
     }
 
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    // Każde 7 dni zaczynając od 0 dni to ten sam tydzień.
     const weekNumber = Math.floor(diffDays / 7) + 1;
 
-    return weekNumber;
+    return Math.min(weekNumber, 20);
+}
+
+/**
+ * Sprawdza, czy intencja powinna być zakończona (minęło 20 tygodni od daty startu).
+ */
+export function isIntentionCompleted(startDateString: string, currentDate: Date = new Date()): boolean {
+    const startDate = new Date(startDateString);
+    startDate.setHours(0, 0, 0, 0);
+
+    const current = new Date(currentDate);
+    current.setHours(0, 0, 0, 0);
+
+    const diffTime = current.getTime() - startDate.getTime();
+    if (diffTime < 0) return false;
+
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays >= 140; // 20 tygodni * 7 dni
+}
+
+/**
+ * Automatycznie aktualizuje w bazie danych i w pamięci intencje, które trwają ponad 20 tygodni.
+ */
+export async function syncIntentionStatus<T extends { id: string; start_date: string; status: string }>(
+    intentions: T[]
+): Promise<T[]> {
+    const expiredIds: string[] = [];
+
+    for (const intention of intentions) {
+        if (intention.status === "active" && isIntentionCompleted(intention.start_date)) {
+            intention.status = "completed";
+            expiredIds.push(intention.id);
+        }
+    }
+
+    if (expiredIds.length > 0) {
+        await supabase
+            .from("intentions")
+            .update({ status: "completed" })
+            .in("id", expiredIds);
+    }
+
+    return intentions;
 }
 
 /**

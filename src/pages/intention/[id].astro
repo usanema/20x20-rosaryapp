@@ -13,22 +13,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calendar, Users } from "lucide-react";
-import { getCurrentWeek, getMysteryForSlot } from "../../lib/rosary";
+import { getCurrentWeek, getMysteryForSlot, syncIntentionStatus } from "../../lib/rosary";
 
 export const prerender = false;
 
 const { id } = Astro.params;
 
 // 1. Fetch details
-const { data: intention, error: intentionError } = await supabase
+const { data: rawIntention, error: intentionError } = await supabase
     .from("intentions")
     .select("*")
     .eq("id", id)
     .single();
 
-if (intentionError || !intention) {
+if (intentionError || !rawIntention) {
     return new Response("Nie znaleziono intencji.", { status: 404 });
 }
+
+const intention = (await syncIntentionStatus([rawIntention]))[0];
 
 // 2. Fetch participants
 const { data: participants, error: participantsError } = await supabase
@@ -42,50 +44,54 @@ let formSuccess = false;
 
 // 3. Handle Form if POST
 if (Astro.request.method === "POST") {
-    const formData = await Astro.request.formData();
-    const firstName = String(formData.get("firstName") || "").trim();
-    const lastName = String(formData.get("lastName") || "").trim();
-    const email = String(formData.get("email") || "").trim();
-
-    if (!firstName) {
-        pError = "Imię jest wymagane.";
+    if (intention.status === "completed") {
+        pError = "Ta intencja została już zakończona.";
     } else {
-        // Find first empty slot
-        const takenSlots = new Set((participants || []).map((p) => p.slot));
-        let nextSlot = -1;
-        for (let i = 1; i <= 20; i++) {
-            if (!takenSlots.has(i)) {
-                nextSlot = i;
-                break;
-            }
-        }
+        const formData = await Astro.request.formData();
+        const firstName = String(formData.get("firstName") || "").trim();
+        const lastName = String(formData.get("lastName") || "").trim();
+        const email = String(formData.get("email") || "").trim();
 
-        if (nextSlot === -1) {
-            pError = "Niestety, wszystkie miejsca (20) są już zajęte.";
+        if (!firstName) {
+            pError = "Imię jest wymagane.";
         } else {
-            const { error: insertError } = await supabase
-                .from("participants")
-                .insert([
-                    {
-                        intention_id: id,
-                        first_name: firstName,
-                        last_name: lastName || null,
-                        email: email || null,
-                        slot: nextSlot,
-                    },
-                ]);
-
-            if (insertError) {
-                if (insertError.code === "23505") {
-                    pError = "Ktoś właśnie zajął to miejsce! Spróbuj ponownie.";
-                } else {
-                    pError = "Błąd dołączania: " + insertError.message;
+            // Find first empty slot
+            const takenSlots = new Set((participants || []).map((p) => p.slot));
+            let nextSlot = -1;
+            for (let i = 1; i <= 20; i++) {
+                if (!takenSlots.has(i)) {
+                    nextSlot = i;
+                    break;
                 }
+            }
+
+            if (nextSlot === -1) {
+                pError = "Niestety, wszystkie miejsca (20) są już zajęte.";
             } else {
-                formSuccess = true;
-                // Zreloaduj aby wczytać nowego uczestnika bez przekierowań (Astro)
-                // Można zwrócić Redirect na sam siebie żeby wyczyścić POST state.
-                return Astro.redirect(`/intention/${id}`);
+                const { error: insertError } = await supabase
+                    .from("participants")
+                    .insert([
+                        {
+                            intention_id: id,
+                            first_name: firstName,
+                            last_name: lastName || null,
+                            email: email || null,
+                            slot: nextSlot,
+                        },
+                    ]);
+
+                if (insertError) {
+                    if (insertError.code === "23505") {
+                        pError = "Ktoś właśnie zajął to miejsce! Spróbuj ponownie.";
+                    } else {
+                        pError = "Błąd dołączania: " + insertError.message;
+                    }
+                } else {
+                    formSuccess = true;
+                    // Zreloaduj aby wczytać nowego uczestnika bez przekierowań (Astro)
+                    // Można zwrócić Redirect na sam siebie żeby wyczyścić POST state.
+                    return Astro.redirect(`/intention/${id}`);
+                }
             }
         }
     }
@@ -166,8 +172,7 @@ const slotsData = Array.from({ length: 20 }, (_, i) => {
                     class="flex items-center gap-2 bg-white/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/60 shadow-sm w-fit"
                 >
                     <Users className="w-4 h-4 opacity-70" /> Aktualny tydzień: <strong
-                        class="text-black ml-1 text-base">{weekNumber}</strong
-                    >
+                        class="text-black ml-1 text-base">{weekNumber}{intention.status === "completed" ? " / 20" : ""}</strong>
                 </div>
             </div>
         </CardContent>
@@ -262,7 +267,20 @@ const slotsData = Array.from({ length: 20 }, (_, i) => {
         {/* Formularz lub Info */}
         <div class="lg:sticky lg:top-8">
             {
-                (participants?.length || 0) < 20 ? (
+                intention.status === "completed" ? (
+                    <Card className="glass shadow-xl shadow-black/5 rounded-[2rem] bg-gradient-to-br from-black/5 to-transparent border border-black/10 p-2">
+                        <CardHeader>
+                            <CardTitle className="text-2xl text-black font-semibold flex items-center gap-2">
+                                Modlitwa zakończona
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p class="text-sm text-muted-foreground">
+                                Ta intencja modlitewna zakończyła swój pełny cykl 20 tygodni modlitwy.
+                            </p>
+                        </CardContent>
+                    </Card>
+                ) : (participants?.length || 0) < 20 ? (
                     <Card className="glass border-white/40 shadow-xl shadow-black/5 rounded-[2rem] relative overflow-hidden">
                         <div class="absolute inset-0 bg-gradient-to-br from-white/50 to-transparent pointer-events-none" />
                         <form method="POST" class="relative z-10">

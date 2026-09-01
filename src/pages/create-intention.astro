@@ -28,23 +28,17 @@ if (Astro.request.method === "POST") {
     } else if (!rawDate) {
         errorMessage = "Data rozpoczęcia jest wymagana.";
     } else {
-        const startDate = new Date(rawDate);
-        // Niedziela == 0
-        if (startDate.getDay() !== 0) {
-            errorMessage = "Planowana data startu musi być Niedzielą.";
-        } else {
-            // Create new intention
-            const { data, error } = await supabase
-                .from("intentions")
-                .insert([{ title, start_date: rawDate }])
-                .select()
-                .single();
+        // Create new intention
+        const { data, error } = await supabase
+            .from("intentions")
+            .insert([{ title, start_date: rawDate }])
+            .select()
+            .single();
 
-            if (error) {
-                errorMessage = "Błąd zapisywania do bazy: " + error.message;
-            } else if (data) {
-                return Astro.redirect(`/intention/${data.id}`);
-            }
+        if (error) {
+            errorMessage = "Błąd zapisywania do bazy: " + error.message;
+        } else if (data) {
+            return Astro.redirect(`/intention/${data.id}`);
         }
     }
 }
@@ -111,7 +105,7 @@ if (Astro.request.method === "POST") {
                         required
                     />
                     <p class="text-sm text-muted-foreground ml-2">
-                        Zwróć uwagę, by wyznaczony dzień był Niedzielą.
+                        Wybierz dowolny dzień rozpoczęcia modlitwy.
                     </p>
                 </div>
             </CardContent>
@@ -125,25 +119,4 @@ if (Astro.request.method === "POST") {
             </CardFooter>
         </form>
     </Card>
-
-    <script>
-        // JS Validation to gently hint users
-        const dateInput = document.getElementById(
-            "startDate"
-        ) as HTMLInputElement;
-        if (dateInput) {
-            dateInput.addEventListener("change", (e) => {
-                const val = (e.target as HTMLInputElement).value;
-                if (val) {
-                    const d = new Date(val);
-                    if (d.getDay() !== 0) {
-                        alert(
-                            "Wybrana data nie jest Niedzielą na początek tygodnia."
-                        );
-                        (e.target as HTMLInputElement).value = ""; // Reset
-                    }
-                }
-            });
-        }
-    </script>
 </Layout>
